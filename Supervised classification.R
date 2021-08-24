@@ -5,14 +5,13 @@ library(mlr3extralearners)
 library(mlr3)
 library(mlr3learners)
 library(caret)
-library(e1071) #naive bayes
-library(ranger) #rf rpart
-library(kknn) #knn
-library(kernlab) #svm
-library(gbm) #adaboost
+library(e1071) 
+library(ranger) 
+library(kknn) 
+library(kernlab) 
+library(gbm) 
 
-setwd("D:/Postgrad/SEM2/STA582 PMS/PMS Tugas 2")
-
+# Import data
 raw = read.csv("tugas.csv")
 raw[,4] = as.Date(raw[,4], "%m/%d/%y")
 raw[,5] = as.Date(raw[,5], "%m/%d/%y")
@@ -23,12 +22,13 @@ for (i in u) {
   raw[,i] = as.factor(raw[,i])
 }
 
+# Data Splitting
 set.seed(1000)
 idx = sample.int(nrow(raw), size=0.7*nrow(raw))
 train = raw[idx, c(2,3,6:23,25)]
 test = raw[-idx, c(2,3,6:23,25)]
 
-#mlr3 eco
+# Data training using mlr3 ecosystem
 task_class = TaskClassif$new(id="class", backend = train, 
                              target = "Re.engagement_result",
                              positive = "1")
@@ -39,10 +39,10 @@ model_rf = lrn("classif.ranger")
 model_knn = lrn("classif.kknn", k=10, kernel="rectangular")
 model_svm = lrn("classif.ksvm")
 model_gbm = lrn("classif.gbm")
+as.data.table(model_svm$param_set) #hyperparam checking
 
-as.data.table(model_svm$param_set) #cek hyperpar
-
-param_bound_nb = ParamSet$new(params = list(ParamDbl$new("laplace", #smoothing param
+# Define Hyperparameter
+param_bound_nb = ParamSet$new(params = list(ParamDbl$new("laplace", 
                                                          lower = 0,
                                                          upper = 1)))
 param_bound_dt = ParamSet$new(params = list(ParamDbl$new("cp", 
@@ -66,11 +66,12 @@ param_bound_gbm = ParamSet$new(params = list(ParamInt$new("n.minobsinnode",
                                                           lower = 1,
                                                           upper = 5)))
 
+# CV inner validation
 terminate = trm("evals", n_evals = 10) 
 tuner = tnr("random_search") 
 resample_inner = rsmp("holdout")
 
-#Autotuner
+# Autotuner for hyperparameter optimization
 model_nb_tune = AutoTuner$new(learner = model_nb,
                               measure = msr("classif.bacc"),
                               terminator = terminate,
@@ -119,7 +120,7 @@ model_gbm_tune = AutoTuner$new(learner = model_gbm,
                                tuner = tuner,
                                store_models = TRUE)
 
-#evaluasi dalam cv
+# CV outer validation
 resample_outer = rsmp("cv", folds=5)
 set.seed(1)
 resample_outer$instantiate(task = task_class)
@@ -143,14 +144,14 @@ result = bmr$aggregate(list(msr("classif.acc"),
                             msr("classif.sensitivity"),
                             msr("classif.bacc")))
 result
-result0 = as.data.frame(result[1:6, c(4,7:10)])
+result_fin = as.data.frame(result[1:6, c(4,7:10)])
 
-
-#Menampilkan hyperparameter terbaik
+#Showing best hyperparameter on each model
 get_param_res = function(i){
   as.data.table(bmr)$learner[[i]]$tuning_result
 }
 
+# Optimized hyperparameter of Naive Bayes
 best_nb_param =map_dfr(1:5,get_param_res)
 best_nb_param
 
@@ -160,6 +161,7 @@ best_nb_param_value <-  c(best_nb_param %>%
                             slice_max(classif.bacc) %>%
                             pull(laplace))
 
+#Optimized hyperparameter of Decision Tree
 best_dt_param =map_dfr(6:10,get_param_res)
 best_dt_param
 
@@ -172,6 +174,7 @@ best_dt_param_value <-  c(best_dt_param %>%
                             slice_max(classif.bacc) %>%
                             pull(minsplit))
 
+#Optimized hyperparameter of Random Forest
 best_rf_param =map_dfr(11:15,get_param_res)
 best_rf_param
 
@@ -181,6 +184,7 @@ best_rf_param_value <-  c(best_rf_param %>%
                             slice_max(classif.bacc) %>%
                             pull(max.depth))
 
+#Optimized hyperparameter of K-Nearest Neighbor
 best_knn_param =map_dfr(16:20,get_param_res)
 best_knn_param
 
@@ -190,6 +194,7 @@ best_knn_param_value <-  c(best_knn_param %>%
                             slice_max(classif.bacc) %>%
                             pull(k))
 
+#Optimized hyperparameter of Support Vector Machine
 best_svm_param =map_dfr(21:25,get_param_res)
 best_svm_param
 
@@ -199,6 +204,7 @@ best_svm_param_value <-  c(best_svm_param %>%
                              slice_max(classif.bacc) %>%
                              pull(degree))
 
+#Optimized hyperparameter of Gradient Boosting 
 best_gbm_param =map_dfr(26:30,get_param_res)
 best_gbm_param
 
@@ -208,57 +214,58 @@ best_gbm_param_value <-  c(best_gbm_param %>%
                              slice_max(classif.bacc) %>%
                              pull(n.minobsinnode))
 
-#model terbaik
-#naive bayes
+# Data Testing
+
+# Naive Bayes
 model_nb_best = lrn("classif.naive_bayes", laplace=best_nb_param_value)
 model_nb_best$train(task = task_class)
 
-prediksi_nb <- model_nb_best$predict_newdata(newdata = test)
-as.data.table(prediksi_nb)
+prediction_nb <- model_nb_best$predict_newdata(newdata = test)
+as.data.table(prediction_nb)
 nb = model_nb_best$predict_newdata(newdata = test)$confusion
 confusionMatrix(nb, positive="1")
 
-#decision tree
+# Decision Tree
 model_dt_best = lrn("classif.rpart", cp=best_dt_param_value[1],
                     minsplit=best_dt_param_value[2])
 model_dt_best$train(task = task_class)
 
-prediksi_dt <- model_dt_best$predict_newdata(newdata = test)
-as.data.table(prediksi_dt)
+prediction_dt <- model_dt_best$predict_newdata(newdata = test)
+as.data.table(prediction_dt)
 dt = model_dt_best$predict_newdata(newdata = test)$confusion
 confusionMatrix(dt, positive="1")
 
-#random forest
+# Random Forest
 model_rf_best = lrn("classif.ranger", max.depth=best_rf_param_value, 
                     importance="impurity")
 model_rf_best$train(task = task_class)
 
-prediksi_rf <- model_rf_best$predict_newdata(newdata = test)
-as.data.table(prediksi_rf)
+prediction_rf <- model_rf_best$predict_newdata(newdata = test)
+as.data.table(prediction_rf)
 rf = model_rf_best$predict_newdata(newdata = test)$confusion
 confusionMatrix(rf, positive="1")
 
-#knn
+# KNN
 model_knn_best = lrn("classif.kknn", k=best_knn_param_value,
                      kernel="rectangular")
 model_knn_best$train(task = task_class)
 
-prediksi_knn <- model_knn_best$predict_newdata(newdata = test)
-as.data.table(prediksi_knn)
+prediction_knn <- model_knn_best$predict_newdata(newdata = test)
+as.data.table(prediction_knn)
 knn = model_knn_best$predict_newdata(newdata = test)$confusion
 confusionMatrix(knn, positive="1")
 
-#svm
+# SVM
 model_svm_best = lrn("classif.ksvm", degree=best_svm_param_value, 
                      kernel="polydot")
 model_svm_best$train(task = task_class)
 
-prediksi_svm <- model_svm_best$predict_newdata(newdata = test)
-as.data.table(prediksi_svm)
+prediction_svm <- model_svm_best$predict_newdata(newdata = test)
+as.data.table(prediction_svm)
 svm = model_svm_best$predict_newdata(newdata = test)$confusion
 confusionMatrix(svm, positive="1")
 
-#gbm
+# GBM
 model_gbm_best = lrn("classif.gbm", n.minobsinnode=best_gbm_param_value)
 model_gbm_best$train(task = task_class)
 model_gbm_best$importance()
@@ -268,4 +275,4 @@ as.data.table(prediksi_gbm)
 gbm = model_gbm_best$predict_newdata(newdata = test)$confusion
 confusionMatrix(gbm, positive="1")
 
-#gbm terbaek
+#Best result is GBM
