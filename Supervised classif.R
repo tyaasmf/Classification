@@ -12,7 +12,7 @@ library(kernlab)
 library(gbm) 
 
 # Import data
-raw = read.csv("tugas.csv")
+raw = read.csv("dataset.csv")
 raw[,4] = as.Date(raw[,4], "%m/%d/%y")
 raw[,5] = as.Date(raw[,5], "%m/%d/%y")
 raw[,24] = as.Date(raw[,24], "%m/%d/%y")
