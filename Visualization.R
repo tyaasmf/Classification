@@ -1,20 +1,20 @@
-#VISUALISATION
+# VISUALISATION
 library(tidyverse)
 library(DataExplorer)
 library(GGally)
 library(skimr)
 library(ggplot2)
 
-#big picture
+# big picture
 plot_intro(data = raw, geom_label_args = list(size=2.5))
 skim_without_charts(data = raw)
 plot_bar(data = raw, by="Re.engagement_result")
 barplot(prop.table(table(result))*100, main = "Re-engagement Result", 
-        xlab="Persentase (%)", col=c("Steel Blue","Dark Blue"),
+        xlab="Percentage (%)", col=c("Steel Blue","Dark Blue"),
         horiz=TRUE)
-result = ifelse(raw$Re.engagement_result==1, "Bersedia", "Menolak")
+result = ifelse(raw$Re.engagement_result==1, "Yes", "No")
 
-#by class
+# by class
 yes = raw %>% filter(Re.engagement_result==1)
 no = raw %>% filter(Re.engagement_result==0)
 
@@ -25,9 +25,9 @@ plot_histogram(data=raw$Age)
 hist(raw$Age, xlab="Age", main="Age Distribution of PLWHA Client",
      col="Steel Blue")
 
-hist(no$Age, xlab="Usia", main="Sebaran Usia Klien ODHA yang Menolak Terapi",
+hist(no$Age, xlab="Age", main="Age Distribution of PLWHA Client (Refused)",
      col="coral")
-hist(yes$Age, xlab="Usia", main="Sebaran Usia Klien ODHA yang Bersedia Terapi",
+hist(yes$Age, xlab="Age", main="Age Distribution of PLWHA Client (Accept)",
      col="pink")
 
 #Train b.acc graph
